@@ -16,7 +16,7 @@ const notes = [
     {note: 'G3', freq: 196},
     {note: 'B3', freq: 246.94},
     {note: 'E4', freq: 329.63},
-    
+
     // Original notes
     {note: 'A4', freq: 440},
     {note: 'A#4', freq: 466.164 },
@@ -32,21 +32,28 @@ const notes = [
     {note: 'G#5', freq: 830.609},
 ];
 
+// Define a particle class
 class Particle {
-    constructor(x, y, note) {
-        this.x = x;
-        this.y = y;
-        this.note = note;
-        this.color = color(random(255), random(255), random(255));
-        this.radius = 5;
-        this.velocityX = random(-1, 1);
-        this.velocityY = random(-5, -1);
+    constructor(x, y, color) {
+        this.pos = createVector(x, y);
+        this.vel = createVector(0, 0);
+        this.acc = createVector(0, 0);
+        this.color = color;
+        this.maxSpeed = 4;
+        this.maxForce = 0.1;
+        this.alpha = 255;
+    }
+
+    applyForce(force) {
+        this.acc.add(force);
     }
 
     update() {
-        this.x += this.velocityX;
-        this.y += this.velocityY;
-        this.alpha -= 5;
+        this.vel.add(this.acc);
+        this.vel.limit(this.maxSpeed);
+        this.pos.add(this.vel);
+        this.acc.mult(0);
+        this.alpha -= 1;
     }
 
     finished() {
@@ -56,27 +63,37 @@ class Particle {
     show() {
         noStroke();
         fill(this.color[0], this.color[1], this.color[2], this.alpha);
-        ellipse(this.x, this.y, this.radius * 2);
+        ellipse(this.pos.x, this.pos.y, 5);
     }
 }
 
 let particles = [];
+let flowField = [];
 
 const startButton = document.getElementById('startButton');
     startButton.addEventListener('click', setup);
 
 
-function setup(){
-    createCanvas(canvasWidth, canvasHeight);
-    audioContext.resume();
-    navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(function (stream) {
-        mic = new p5.AudioIn();
-        mic.start(listeningForPitch);
-    })
-    .catch(function (err) {
-        console.error('Error accessing microphone:', err);
-  });
+    function setup(){
+        createCanvas(canvasWidth, canvasHeight);
+        audioContext.resume();
+        navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function (stream) {
+            mic = new p5.AudioIn();
+            mic.start(listeningForPitch);
+        })
+        .catch(function (err) {
+            console.error('Error accessing microphone:', err);
+      });
+
+  // Create flow field grid
+  for (let x = 0; x < canvasWidth; x += 20) {
+    flowField[x] = [];
+    for (let y = 0; y < canvasHeight; y += 20) {
+      let angle = map(noise(x * 0.01, y * 0.01), 0, 1, 0, TWO_PI * 2);
+      flowField[x][y] = createVector(cos(angle), sin(angle));
+    }
+  }
 };
 
 function listeningForPitch() {
@@ -131,24 +148,49 @@ function draw() {
     }
     rect(200 + diff / 2, 100, 10, 75);
 
-    // Spawning particles when a certain note is heard
-    if(abs(diff) < threshold){
-        let color = [random(255), random(255), random(255)];
-        for (let i = 0; i < 10; i++) {
-            let particle = new Particle(random(width), height, closestNote.note);  // or 'color'
+    // Spawn particles when a certain note is heard
+    if (abs(diff) < threshold) {
+        let color = [random(255), random(255), random(255)]; // Random color for the particle
+        for (let i = 0; i < 10; i++) { // Spawn 10 particles
+            let particle = new Particle(random(width), random(height), color);
             particles.push(particle);
         }
     }
 
-    //Update and show particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-        particles[i].update();
-        particles[i].show();
-        if (particles[i].finished()) {
+    // Create a flow field using Perlin noise
+    let cols = 10;
+    let rows = 10;
+    let scl = 50;
+    let flowField = new Array(cols * rows);
+    let xoff = 0;
+    for (let i = 0; i < cols; i++) {
+        let yoff = 0;
+        for (let j = 0; j < rows; j++) {
+            let index = i + j * cols;
+            let angle = noise(xoff, yoff, frameCount * 0.01) * TWO_PI * 4;
+            let v = p5.Vector.fromAngle(angle);
+            v.setMag(1);
+            flowField[index] = v;
+            yoff += 0.1;
+        }
+        xoff += 0.1;
+    }
+
+    // Apply flow field to particles
+    for (let i = 0; i < particles.length; i++) {
+        let particle = particles[i];
+        let x = floor(particle.pos.x / scl);
+        let y = floor(particle.pos.y / scl);
+        let index = x + y * cols;
+        let force = flowField[index];
+        particle.applyForce(force);
+        particle.update();
+        particle.show();
+        if (particle.finished()) {
             particles.splice(i, 1);
         }
     }
-};
+}
 
 function modelLoaded() {
     console.log('Model Loaded');
