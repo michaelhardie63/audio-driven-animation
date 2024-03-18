@@ -162,12 +162,12 @@ function draw() {
     let rows = 10;
     let scl = 50;
     let flowField = new Array(cols * rows);
-    let xoff = 0;
+    let xoff = closestNote.freq * 0.01;; // Adjusting perlin noise based on note frequency
     for (let i = 0; i < cols; i++) {
         let yoff = 0;
         for (let j = 0; j < rows; j++) {
             let index = i + j * cols;
-            let angle = noise(xoff, yoff, frameCount * 0.01) * TWO_PI * 4;
+            let angle = noise(xoff, yoff, frameCount * 0.01) * TWO_PI * 4; // Using Perlin noise
             let v = p5.Vector.fromAngle(angle);
             v.setMag(1);
             flowField[index] = v;
