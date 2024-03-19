@@ -162,18 +162,20 @@ function draw() {
     let rows = 10;
     let scl = 50;
     let flowField = new Array(cols * rows);
-    let xoff = closestNote.freq * 0.01;; // Adjusting perlin noise based on note frequency
+    let noiseScale = 0.1;
     for (let i = 0; i < cols; i++) {
-        let yoff = 0;
         for (let j = 0; j < rows; j++) {
-            let index = i + j * cols;
-            let angle = noise(xoff, yoff, frameCount * 0.01) * TWO_PI * 4; // Using Perlin noise
-            let v = p5.Vector.fromAngle(angle);
-            v.setMag(1);
-            flowField[index] = v;
-            yoff += 0.1;
+            let x = i * scl;
+            let y = j * scl;
+            let angle = 0;
+            let amplitude = 1;
+            for (let octave = 0; octave < 4; octave++) {
+                angle=+ noise(x * noiseScale, y * noiseScale) * TWO_PI * amplitude;
+                amplitude *= 0.5; // Decrease amplitude with each octave
+                noiseScale *= 2; // Increase frequency with each octave
+            }
+            flowField[i + j * cols] = p5.Vector.fromAngle(angle);
         }
-        xoff += 0.1;
     }
 
     // Apply flow field to particles
